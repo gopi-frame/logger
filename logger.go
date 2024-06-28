@@ -1,168 +1,57 @@
 package logger
 
-import (
-	"io"
-	"os"
-	"sync"
+import "github.com/gopi-frame/logger/contract"
 
-	"github.com/gopi-frame/contract/event"
-	"github.com/gopi-frame/contract/logger"
-	events "github.com/gopi-frame/logger/event"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-)
+type logger struct {
+	logger  contract.Logger
+	options Options
+}
 
-var _ logger.Logger = (*Logger)(nil)
-
-// NewLogger new logger
-func NewLogger(options ...Option) *Logger {
-	logger := new(Logger)
-	for _, option := range options {
-		option(logger)
+func (w logger) open() contract.Logger {
+	if w.logger != nil {
+		return w.logger
 	}
-	return logger
-}
-
-// Logger logger
-type Logger struct {
-	once       sync.Once
-	driver     *zap.Logger
-	dispatcher event.Dispatcher
-	formatter  logger.Formatter
-	hooks      []logger.Hook
-	outputs    []io.Writer
-	zapOptions []zap.Option
-}
-
-func (l *Logger) lazyInit() {
-	l.once.Do(func() {
-		var encoder zapcore.Encoder
-		if l.formatter == nil {
-			encoder = zapcore.NewJSONEncoder(zapcore.EncoderConfig{
-				MessageKey:    "message",
-				LevelKey:      "level",
-				TimeKey:       "timestamp",
-				NameKey:       "name",
-				CallerKey:     "function",
-				StacktraceKey: "stacktrace",
-			})
-		} else {
-			encoder = newEncoder(l.formatter)
-		}
-		var writer zapcore.WriteSyncer
-		if len(l.outputs) == 0 {
-			writer = zapcore.AddSync(os.Stdout)
-		} else {
-			writers := []zapcore.WriteSyncer{}
-			for _, output := range l.outputs {
-				writers = append(writers, zapcore.AddSync(output))
-			}
-			writer = zapcore.NewMultiWriteSyncer(writers...)
-		}
-		core := zapcore.NewCore(encoder, writer, zapcore.DebugLevel)
-		if len(l.hooks) > 0 {
-			for _, hook := range l.hooks {
-				core = zapcore.RegisterHooks(core, func(e zapcore.Entry) error {
-					if hook.Enable(e.Level.String()) {
-						return hook.Handle(&entry{Entry: e})
-					}
-					return nil
-				})
-			}
-		}
-		driver := zap.New(core, l.zapOptions...)
-		l.driver = driver
-	})
-}
-
-// Dispatcher set event dispatcher
-func (l *Logger) Dispatcher(d event.Dispatcher) {
-	l.dispatcher = d
-}
-
-// Formatter set formatter
-func (l *Logger) Formatter(formatter logger.Formatter) {
-	l.formatter = formatter
-}
-
-// Hooks set hook
-func (l *Logger) Hooks(hooks ...logger.Hook) {
-	l.hooks = hooks
-}
-
-// Outputs set outputs
-func (l *Logger) Outputs(outputs ...io.Writer) {
-	l.outputs = outputs
-}
-
-// Debug debug
-func (l *Logger) Debug(message string, fields map[string]any) {
-	l.lazyInit()
-	values := []zap.Field{zap.Namespace("context")}
-	for key, value := range fields {
-		values = append(values, zap.Any(key, value))
+	driver := w.options.Driver()
+	logger, err := Open(driver, w.options)
+	if err != nil {
+		panic(err)
 	}
-	l.driver.Debug(message, values...)
-	l.dispatchEvent(zap.DebugLevel.String(), message, fields)
+	w.logger = logger
+	return w.logger
 }
 
-// Info info
-func (l *Logger) Info(message string, fields map[string]any) {
-	l.lazyInit()
-	values := []zap.Field{zap.Namespace("context")}
-	for key, value := range fields {
-		values = append(values, zap.Any(key, value))
+func active(l contract.Logger) logger {
+	return logger{
+		logger: l,
 	}
-	l.driver.Info(message, values...)
-	l.dispatchEvent(zap.InfoLevel.String(), message, fields)
 }
 
-// Warn warn
-func (l *Logger) Warn(message string, fields map[string]any) {
-	l.lazyInit()
-	values := []zap.Field{zap.Namespace("context")}
-	for key, value := range fields {
-		values = append(values, zap.Any(key, value))
+func lazy(options Options) logger {
+	return logger{
+		options: options,
 	}
-	l.driver.Warn(message, values...)
-	l.dispatchEvent(zap.WarnLevel.String(), message, fields)
 }
 
-// Error error
-func (l *Logger) Error(message string, fields map[string]any) {
-	l.lazyInit()
-	values := []zap.Field{zap.Namespace("context")}
-	for key, value := range fields {
-		values = append(values, zap.Any(key, value))
-	}
-	l.driver.Error(message, values...)
-	l.dispatchEvent(zap.ErrorLevel.String(), message, fields)
+func (l logger) Debug(message string, fields map[string]any) {
+	l.open().Debug(message, fields)
 }
 
-// Fatal fatal
-func (l *Logger) Fatal(message string, fields map[string]any) {
-	l.lazyInit()
-	values := []zap.Field{zap.Namespace("context")}
-	for key, value := range fields {
-		values = append(values, zap.Any(key, value))
-	}
-	l.driver.Fatal(message, values...)
-	l.dispatchEvent(zap.ErrorLevel.String(), message, fields)
+func (l logger) Info(message string, fields map[string]any) {
+	l.open().Info(message, fields)
 }
 
-// Panic panic
-func (l *Logger) Panic(message string, fields map[string]any) {
-	l.lazyInit()
-	values := []zap.Field{zap.Namespace("context")}
-	for key, value := range fields {
-		values = append(values, zap.Any(key, value))
-	}
-	l.driver.Panic(message, values...)
-	l.dispatchEvent(zap.PanicLevel.String(), message, fields)
+func (l logger) Warn(message string, fields map[string]any) {
+	l.open().Warn(message, fields)
 }
 
-func (l *Logger) dispatchEvent(level string, message string, fields map[string]any) {
-	if l.dispatcher != nil {
-		l.dispatcher.Dispatch(events.NewMessageLogged(level, message, fields))
-	}
+func (l logger) Error(message string, fields map[string]any) {
+	l.open().Error(message, fields)
+}
+
+func (l logger) Fatal(message string, fields map[string]any) {
+	l.open().Fatal(message, fields)
+}
+
+func (l logger) Panic(message string, fields map[string]any) {
+	l.open().Panic(message, fields)
 }
