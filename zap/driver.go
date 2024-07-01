@@ -2,7 +2,7 @@ package zap
 
 import (
 	"github.com/gopi-frame/logger"
-	"github.com/gopi-frame/logger/contract"
+	"github.com/gopi-frame/logger/driver"
 )
 
 var driverName = "zap"
@@ -15,7 +15,7 @@ func init() {
 
 type Driver struct{}
 
-func (c *Driver) Open(options map[string]any) (contract.Logger, error) {
+func (c *Driver) Open(options map[string]any) (driver.Logger, error) {
 	cfg, err := UnmarshalOptions(options)
 	if err != nil {
 		return nil, err

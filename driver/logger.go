@@ -1,4 +1,4 @@
-package contract
+package driver
 
 // Logger logger
 type Logger interface {

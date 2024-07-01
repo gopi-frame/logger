@@ -1,8 +1,6 @@
 package zap
 
 import (
-	"fmt"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -30,7 +28,6 @@ func (z *Logger) Debug(message string, fields map[string]any) {
 	for key, value := range fields {
 		values = append(values, zap.Any(key, value))
 	}
-	fmt.Println(z.Logger)
 	z.Logger.Debug(message, values...)
 	z.dispatchEvent(zap.DebugLevel.String(), message, fields)
 }
