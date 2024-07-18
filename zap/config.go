@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/gopi-frame/exception"
 	"github.com/gopi-frame/writer"
-	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

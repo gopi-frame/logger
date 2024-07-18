@@ -5,13 +5,13 @@ import (
 	"sort"
 
 	"github.com/gopi-frame/collection/kv"
+	"github.com/gopi-frame/contract/logger"
 	"github.com/gopi-frame/exception"
-	"github.com/gopi-frame/logger/driver"
 )
 
-var drivers = kv.NewMap[string, driver.Driver]()
+var drivers = kv.NewMap[string, logger.Driver]()
 
-func Register(driverName string, driver driver.Driver) {
+func Register(driverName string, driver logger.Driver) {
 	drivers.Lock()
 	defer drivers.Unlock()
 	if driver == nil {
@@ -31,7 +31,7 @@ func Drivers() []string {
 	return list
 }
 
-func Open(driverName string, options map[string]any) (driver.Logger, error) {
+func Open(driverName string, options map[string]any) (logger.Logger, error) {
 	drivers.RLock()
 	driver, ok := drivers.Get(driverName)
 	drivers.RUnlock()
