@@ -1,6 +1,8 @@
 package zap
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -13,6 +15,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// DefaultWriter is the default writer for zap logger.
+var DefaultWriter zapcore.WriteSyncer = os.Stdout
+
+// Config is the configuration for zap logger.
 type Config struct {
 	Level         zapcore.Level             `json:"level" yaml:"level" toml:"level"`
 	Development   bool                      `json:"development" yaml:"development" toml:"development"`
@@ -21,7 +27,7 @@ type Config struct {
 	CallerSkip    int                       `json:"callerSkip" yaml:"callerSkip" toml:"callerSkip"`
 	Encoder       string                    `json:"encoder" yaml:"encoder" toml:"encoder"`
 	EncoderConfig zapcore.EncoderConfig     `json:"encoderConfig" yaml:"encoderConfig" toml:"encoderConfig"`
-	Outputs       map[string]map[string]any `json:"outputs" yaml:"outputs" toml:"outputs"`
+	Writers       map[string]map[string]any `json:"writers" yaml:"writers" toml:"writers"`
 
 	Hooks         []func(zapcore.Entry) error `json:"-" yaml:"-" toml:"-"`
 	Stacktrace    zapcore.LevelEnabler        `json:"-" yaml:"-" toml:"-"`
@@ -31,9 +37,10 @@ type Config struct {
 	Clock         zapcore.Clock               `json:"-" yaml:"-" toml:"-"`
 }
 
+// NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Level:   zapcore.WarnLevel,
+		Level:   DefaultLevel,
 		Encoder: EncoderJSON,
 		EncoderConfig: zapcore.EncoderConfig{
 			MessageKey:     DefaultEncoderMessageKey,
@@ -46,14 +53,19 @@ func NewConfig() *Config {
 			EncodeLevel:    zapcore.LowercaseLevelEncoder,
 			EncodeTime:     zapcore.RFC3339TimeEncoder,
 			EncodeDuration: zapcore.StringDurationEncoder,
-			EncodeCaller:   zapcore.FullCallerEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
 			EncodeName:     zapcore.FullNameEncoder,
+			LineEnding:     zapcore.DefaultLineEnding,
+			SkipLineEnding: false,
 		},
+		Stacktrace: zapcore.ErrorLevel,
 	}
 }
 
+// Option is a function that can be used to configure zap logger.
 type Option func(cfg *Config) error
 
+// Apply applies the given options to the [Config].
 func (cfg *Config) Apply(opts ...Option) error {
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
@@ -63,6 +75,7 @@ func (cfg *Config) Apply(opts ...Option) error {
 	return nil
 }
 
+// Level sets the log level.
 func Level(level zapcore.Level) Option {
 	return func(cfg *Config) error {
 		cfg.Level = level
@@ -70,6 +83,9 @@ func Level(level zapcore.Level) Option {
 	}
 }
 
+// Encoder sets the log encoder.
+// AvailableAt encoders: [EncoderJSON], [EncoderText].
+// If empty string is given, it does nothing.
 func Encoder(level string) Option {
 	return func(cfg *Config) error {
 		if level == "" {
@@ -80,6 +96,8 @@ func Encoder(level string) Option {
 	}
 }
 
+// MessageKey sets the message key.
+// If empty string is given, it does nothing.
 func MessageKey(messageKey string) Option {
 	return func(cfg *Config) error {
 		if messageKey == "" {
@@ -90,7 +108,9 @@ func MessageKey(messageKey string) Option {
 	}
 }
 
-func Levelkey(levelKey string) Option {
+// LevelKey sets the level key.
+// If empty string is given, it does nothing.
+func LevelKey(levelKey string) Option {
 	return func(cfg *Config) error {
 		if levelKey == "" {
 			return nil
@@ -100,6 +120,8 @@ func Levelkey(levelKey string) Option {
 	}
 }
 
+// TimeKey sets the time key.
+// If empty string is given, it does nothing.
 func TimeKey(timeKey string) Option {
 	return func(cfg *Config) error {
 		if timeKey == "" {
@@ -110,6 +132,8 @@ func TimeKey(timeKey string) Option {
 	}
 }
 
+// NameKey sets the name key.
+// If empty string is given, it does nothing.
 func NameKey(nameKey string) Option {
 	return func(cfg *Config) error {
 		if nameKey == "" {
@@ -120,6 +144,8 @@ func NameKey(nameKey string) Option {
 	}
 }
 
+// CallerKey sets the caller key.
+// If empty string is given, it does nothing.
 func CallerKey(callerKey string) Option {
 	return func(cfg *Config) error {
 		if callerKey == "" {
@@ -130,6 +156,8 @@ func CallerKey(callerKey string) Option {
 	}
 }
 
+// FunctionKey sets the function key.
+// If empty string is given, it does nothing.
 func FunctionKey(functionKey string) Option {
 	return func(cfg *Config) error {
 		if functionKey == "" {
@@ -140,6 +168,8 @@ func FunctionKey(functionKey string) Option {
 	}
 }
 
+// StacktraceKey sets the stacktrace key.
+// If empty string is given, it does nothing.
 func StacktraceKey(stacktraceKey string) Option {
 	return func(cfg *Config) error {
 		if stacktraceKey == "" {
@@ -150,6 +180,7 @@ func StacktraceKey(stacktraceKey string) Option {
 	}
 }
 
+// SkipLineEnding sets whether to skip line ending in the log.
 func SkipLineEnding(skipLineEnding bool) Option {
 	return func(cfg *Config) error {
 		cfg.EncoderConfig.SkipLineEnding = skipLineEnding
@@ -157,6 +188,8 @@ func SkipLineEnding(skipLineEnding bool) Option {
 	}
 }
 
+// LineEnding sets the line ending in the log.
+// If empty string is given, it does nothing.
 func LineEnding(lineEnding string) Option {
 	return func(cfg *Config) error {
 		if lineEnding == "" {
@@ -167,41 +200,67 @@ func LineEnding(lineEnding string) Option {
 	}
 }
 
+// LevelEncoder sets the level encoder.
+// If nil is given, it does nothing.
 func LevelEncoder(levelEncoder zapcore.LevelEncoder) Option {
 	return func(cfg *Config) error {
+		if levelEncoder == nil {
+			return nil
+		}
 		cfg.EncoderConfig.EncodeLevel = levelEncoder
 		return nil
 	}
 }
 
+// TimeEncoder sets the time encoder.
+// If nil is given, it does nothing.
 func TimeEncoder(timeEncoder zapcore.TimeEncoder) Option {
 	return func(cfg *Config) error {
+		if timeEncoder == nil {
+			return nil
+		}
 		cfg.EncoderConfig.EncodeTime = timeEncoder
 		return nil
 	}
 }
 
+// DurationEncoder sets the duration encoder.
+// If nil is given, it does nothing.
 func DurationEncoder(durationEncoder zapcore.DurationEncoder) Option {
 	return func(cfg *Config) error {
+		if durationEncoder == nil {
+			return nil
+		}
 		cfg.EncoderConfig.EncodeDuration = durationEncoder
 		return nil
 	}
 }
 
+// CallerEncoder sets the caller encoder.
+// If nil is given, it does nothing.
 func CallerEncoder(callerEncoder zapcore.CallerEncoder) Option {
 	return func(cfg *Config) error {
+		if callerEncoder == nil {
+			return nil
+		}
 		cfg.EncoderConfig.EncodeCaller = callerEncoder
 		return nil
 	}
 }
 
+// NameEncoder sets the name encoder.
+// If nil is given, it does nothing.
 func NameEncoder(nameEncoder zapcore.NameEncoder) Option {
 	return func(cfg *Config) error {
+		if nameEncoder == nil {
+			return nil
+		}
 		cfg.EncoderConfig.EncodeName = nameEncoder
 		return nil
 	}
 }
 
+// Development sets the development mode.
 func Development() Option {
 	return func(cfg *Config) error {
 		cfg.Development = true
@@ -209,6 +268,7 @@ func Development() Option {
 	}
 }
 
+// Fields sets the extra fields to the log.
 func Fields(fields map[string]any) Option {
 	return func(cfg *Config) error {
 		cfg.Fields = fields
@@ -216,13 +276,12 @@ func Fields(fields map[string]any) Option {
 	}
 }
 
+// AddCaller enables caller.
 func AddCaller() Option {
-	return func(cfg *Config) error {
-		cfg.Caller = true
-		return nil
-	}
+	return WithCaller(true)
 }
 
+// WithCaller enables or disables caller.
 func WithCaller(enabled bool) Option {
 	return func(cfg *Config) error {
 		cfg.Caller = enabled
@@ -230,6 +289,7 @@ func WithCaller(enabled bool) Option {
 	}
 }
 
+// Hooks adds hooks.
 func Hooks(hooks ...func(zapcore.Entry) error) Option {
 	return func(cfg *Config) error {
 		cfg.Hooks = append(cfg.Hooks, hooks...)
@@ -237,6 +297,7 @@ func Hooks(hooks ...func(zapcore.Entry) error) Option {
 	}
 }
 
+// AddCallerSkip adds caller skip.
 func AddCallerSkip(skip int) Option {
 	return func(cfg *Config) error {
 		cfg.CallerSkip = skip
@@ -244,13 +305,21 @@ func AddCallerSkip(skip int) Option {
 	}
 }
 
+// AddStacktrace adds stacktrace to the log if the level is enabled.
+// If nil is given, it does nothing.
+// For more details, see https://pkg.go.dev/go.uber.org/zap#AddStacktrace.
 func AddStacktrace(level zapcore.LevelEnabler) Option {
 	return func(cfg *Config) error {
+		if cfg.Stacktrace == nil {
+			cfg.Stacktrace = zap.ErrorLevel
+		}
 		cfg.Stacktrace = level
 		return nil
 	}
 }
 
+// IncreaseLevel increases the level of the log.
+// For more details, see https://pkg.go.dev/go.uber.org/zap#IncreaseLevel.
 func IncreaseLevel(level zapcore.LevelEnabler) Option {
 	return func(cfg *Config) error {
 		cfg.IncreaseLevel = level
@@ -258,6 +327,8 @@ func IncreaseLevel(level zapcore.LevelEnabler) Option {
 	}
 }
 
+// WithPanicHook sets the panic hook.
+// For more details, see https://pkg.go.dev/go.uber.org/zap#WithPanicHook.
 func WithPanicHook(hook zapcore.CheckWriteHook) Option {
 	return func(cfg *Config) error {
 		cfg.PanicHook = hook
@@ -265,6 +336,8 @@ func WithPanicHook(hook zapcore.CheckWriteHook) Option {
 	}
 }
 
+// WithFatalHook sets the fatal hook.
+// For more details, see https://pkg.go.dev/go.uber.org/zap#WithFatalHook.
 func WithFatalHook(hook zapcore.CheckWriteHook) Option {
 	return func(cfg *Config) error {
 		cfg.FatalHook = hook
@@ -272,6 +345,8 @@ func WithFatalHook(hook zapcore.CheckWriteHook) Option {
 	}
 }
 
+// WithClock sets the clock.
+// For more details, see https://pkg.go.dev/go.uber.org/zap#WithClock.
 func WithClock(clock zapcore.Clock) Option {
 	return func(cfg *Config) error {
 		cfg.Clock = clock
@@ -279,6 +354,7 @@ func WithClock(clock zapcore.Clock) Option {
 	}
 }
 
+// ZapEncoder returns the zap encoder.
 func (cfg *Config) ZapEncoder() (zapcore.Encoder, error) {
 	var encoder zapcore.Encoder
 	if cfg.Encoder == EncoderJSON {
@@ -289,27 +365,29 @@ func (cfg *Config) ZapEncoder() (zapcore.Encoder, error) {
 	return encoder, nil
 }
 
+// ZapWriters returns the zap writers.
 func (cfg *Config) ZapWriters() (zapcore.WriteSyncer, error) {
-	if len(cfg.Outputs) == 0 {
-		return zapcore.AddSync(os.Stdout), nil
+	if len(cfg.Writers) == 0 {
+		return DefaultWriter, nil
 	}
-	ws := []zapcore.WriteSyncer{}
-	for driverName, options := range cfg.Outputs {
+	var ws []zapcore.WriteSyncer
+	for driverName, options := range cfg.Writers {
 		w, err := writer.Open(driverName, options)
 		if err != nil {
 			return nil, err
 		}
 		ws = append(ws, zapcore.AddSync(w))
 	}
-	return zapcore.NewMultiWriteSyncer(ws...), nil
+	return zapcore.Lock(zapcore.NewMultiWriteSyncer(ws...)), nil
 }
 
+// ZapOptions returns the zap options.
 func (cfg *Config) ZapOptions() []zap.Option {
-	opts := []zap.Option{}
+	var opts []zap.Option
 	if cfg.Development {
 		opts = append(opts, zap.Development())
 	}
-	fields := []zapcore.Field{}
+	var fields []zapcore.Field
 	for key, value := range cfg.Fields {
 		fields = append(fields, zap.Any(key, value))
 	}
@@ -335,6 +413,7 @@ func (cfg *Config) ZapOptions() []zap.Option {
 	return opts
 }
 
+// UnmarshalOptions unmarshal the options.
 func UnmarshalOptions(options map[string]any) (*Config, error) {
 	cfg := NewConfig()
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -345,6 +424,8 @@ func UnmarshalOptions(options map[string]any) (*Config, error) {
 			DecodeTimeEncoderHook,
 			DecodeCallerEncoderHook,
 			DecodeNameEncoderHook,
+			DecodeLevelEnablerHook,
+			DecodeCheckWriteHook,
 		),
 		WeaklyTypedInput: true,
 		Result:           cfg,
@@ -379,23 +460,36 @@ func UnmarshalOptions(options map[string]any) (*Config, error) {
 	return cfg, nil
 }
 
+// DecodeLevelHook decodes the level.
+//
+//   - For type string or []byte, [zapcore.Level.UnmarshalText] will be called to parse the value.
+//   - For type which is convertible to int8, it will convert to the [zapcore.Level] by [reflect.Type.Convert].
+//   - For type [zapcore.Level], it will return the value directly.
+//   - For type [zapcore.LevelEnabler], it will call [zapcore.LevelOf] to get the level.
 func DecodeLevelHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	if t != reflect.TypeFor[zapcore.Level]() {
 		return data, nil
 	}
 	if f == reflect.TypeFor[string]() {
 		var l = new(zapcore.Level)
-		if err := l.UnmarshalText([]byte(data.(string))); err != nil {
+		if err := l.UnmarshalText([]byte(strings.ToUpper(data.(string)))); err != nil {
 			return nil, err
 		}
 		return *l, nil
 	}
 	if f == reflect.TypeFor[[]byte]() {
 		var l = new(zapcore.Level)
-		if err := l.UnmarshalText(data.([]byte)); err != nil {
+		if err := l.UnmarshalText(bytes.ToUpper(data.([]byte))); err != nil {
 			return nil, err
 		}
 		return *l, nil
+	}
+	if f.ConvertibleTo(reflect.TypeFor[int8]()) {
+		l := zapcore.Level(reflect.ValueOf(data).Convert(reflect.TypeFor[int8]()).Interface().(int8))
+		if l >= zapcore.DebugLevel && l <= zapcore.FatalLevel {
+			return l, nil
+		}
+		return nil, exception.NewArgumentException("data", data, "invalid level value")
 	}
 	if f == reflect.TypeFor[zapcore.Level]() {
 		return data.(zapcore.Level), nil
@@ -410,22 +504,24 @@ func DecodeLevelHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	return data, nil
 }
 
+// DecodeDurationEncoderHook decodes the duration encoder.
+//
+//   - For type string or []byte, [zapcore.DurationEncoder.UnmarshalText] will be called to parse the value.
+//   - For type [zapcore.DurationEncoder], it will return the value directly.
+//   - For type func([time.Duration], [zapcore.PrimitiveArrayEncoder]),
+//     it will convert the value to [zapcore.DurationEncoder] and return it.
 func DecodeDurationEncoderHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	if t != reflect.TypeFor[zapcore.DurationEncoder]() {
 		return data, nil
 	}
 	if f == reflect.TypeFor[string]() {
 		var de = new(zapcore.DurationEncoder)
-		if err := de.UnmarshalText([]byte(data.(string))); err != nil {
-			return nil, err
-		}
+		_ = de.UnmarshalText([]byte(data.(string)))
 		return *de, nil
 	}
 	if f == reflect.TypeFor[[]byte]() {
 		var de = new(zapcore.DurationEncoder)
-		if err := de.UnmarshalText(data.([]byte)); err != nil {
-			return nil, err
-		}
+		_ = de.UnmarshalText(data.([]byte))
 		return *de, nil
 	}
 	if f == reflect.TypeFor[zapcore.DurationEncoder]() {
@@ -441,22 +537,26 @@ func DecodeDurationEncoderHook(f reflect.Type, t reflect.Type, data any) (any, e
 	return data, nil
 }
 
+// DecodeTimeEncoderHook decodes the time encoder.
+//
+//   - For type string or []byte, [zapcore.TimeEncoder.UnmarshalText] will be called to parse the value.
+//   - For type [zapcore.TimeEncoder], it will return the value directly.
+//   - For type func([time.Time], [zapcore.PrimitiveArrayEncoder]),
+//     it will convert the value to [zapcore.TimeEncoder] and return it.
+//   - For type map which contains a key named "layout" (case-insensitive),
+//     [zapcore.TimeEncoderOfLayout] will be called to create a time encoder with given layout.
 func DecodeTimeEncoderHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	if t != reflect.TypeFor[zapcore.TimeEncoder]() {
 		return data, nil
 	}
 	if f == reflect.TypeFor[string]() {
 		var te = new(zapcore.TimeEncoder)
-		if err := te.UnmarshalText([]byte(data.(string))); err != nil {
-			return nil, err
-		}
+		_ = te.UnmarshalText([]byte(strings.ToLower(data.(string))))
 		return *te, nil
 	}
 	if f == reflect.TypeFor[[]byte]() {
 		var te = new(zapcore.TimeEncoder)
-		if err := te.UnmarshalText(data.([]byte)); err != nil {
-			return nil, err
-		}
+		_ = te.UnmarshalText(bytes.ToLower(data.([]byte)))
 		return *te, nil
 	}
 	if f == reflect.TypeFor[zapcore.TimeEncoder]() {
@@ -479,22 +579,23 @@ func DecodeTimeEncoderHook(f reflect.Type, t reflect.Type, data any) (any, error
 	return data, nil
 }
 
+// DecodeLevelEncoderHook decodes the level encoder.
+//
+//   - For type string or []byte, [zapcore.LevelEncoder.UnmarshalText] will be called to parse the value.
+//   - For type [zapcore.LevelEncoder], it will return the value directly.
+//   - For type func([zapcore.Level], [zapcore.PrimitiveArrayEncoder]), it will convert the value to [zapcore.LevelEncoder] and return it.
 func DecodeLevelEncoderHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	if t != reflect.TypeFor[zapcore.LevelEncoder]() {
 		return data, nil
 	}
 	if f == reflect.TypeFor[string]() {
 		var le = new(zapcore.LevelEncoder)
-		if err := le.UnmarshalText([]byte(data.(string))); err != nil {
-			return nil, err
-		}
+		_ = le.UnmarshalText([]byte(data.(string)))
 		return *le, nil
 	}
 	if f == reflect.TypeFor[[]byte]() {
 		var le = new(zapcore.LevelEncoder)
-		if err := le.UnmarshalText(data.([]byte)); err != nil {
-			return nil, err
-		}
+		_ = le.UnmarshalText(data.([]byte))
 		return *le, nil
 	}
 	if f == reflect.TypeFor[zapcore.LevelEncoder]() {
@@ -510,22 +611,23 @@ func DecodeLevelEncoderHook(f reflect.Type, t reflect.Type, data any) (any, erro
 	return data, nil
 }
 
+// DecodeCallerEncoderHook decodes the caller encoder.
+//
+//   - For type string or []byte, [zapcore.CallerEncoder.UnmarshalText] will be called to parse the value.
+//   - For type [zapcore.CallerEncoder], it will return the value directly.
+//   - For type func([zapcore.EntryCaller], [zapcore.PrimitiveArrayEncoder]), it will convert the value to [zapcore.CallerEncoder] and return it.
 func DecodeCallerEncoderHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	if t != reflect.TypeFor[zapcore.CallerEncoder]() {
 		return data, nil
 	}
 	if f == reflect.TypeFor[string]() {
 		var ce = new(zapcore.CallerEncoder)
-		if err := ce.UnmarshalText([]byte(data.(string))); err != nil {
-			return nil, err
-		}
+		_ = ce.UnmarshalText([]byte(data.(string)))
 		return *ce, nil
 	}
 	if f == reflect.TypeFor[[]byte]() {
 		var ce = new(zapcore.CallerEncoder)
-		if err := ce.UnmarshalText(data.([]byte)); err != nil {
-			return nil, err
-		}
+		_ = ce.UnmarshalText(data.([]byte))
 		return *ce, nil
 	}
 	if f == reflect.TypeFor[zapcore.CallerEncoder]() {
@@ -541,22 +643,23 @@ func DecodeCallerEncoderHook(f reflect.Type, t reflect.Type, data any) (any, err
 	return data, nil
 }
 
+// DecodeNameEncoderHook decodes the name encoder.
+//
+//   - For type string or []byte, [zapcore.NameEncoder.UnmarshalText] will be called to parse the value.
+//   - For type [zapcore.NameEncoder], it will return the value directly.
+//   - For type func(string, [zapcore.PrimitiveArrayEncoder]), it will convert the value to [zapcore.NameEncoder] and return it.
 func DecodeNameEncoderHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	if t != reflect.TypeFor[zapcore.NameEncoder]() {
 		return data, nil
 	}
 	if f == reflect.TypeFor[string]() {
 		var ne = new(zapcore.NameEncoder)
-		if err := ne.UnmarshalText([]byte(data.(string))); err != nil {
-			return nil, err
-		}
+		_ = ne.UnmarshalText([]byte(data.(string)))
 		return *ne, nil
 	}
 	if f == reflect.TypeFor[[]byte]() {
 		var ne = new(zapcore.NameEncoder)
-		if err := ne.UnmarshalText(data.([]byte)); err != nil {
-			return nil, err
-		}
+		_ = ne.UnmarshalText(data.([]byte))
 		return *ne, nil
 	}
 	if f == reflect.TypeFor[zapcore.NameEncoder]() {
@@ -568,6 +671,137 @@ func DecodeNameEncoderHook(f reflect.Type, t reflect.Type, data any) (any, error
 	}
 	if f == reflect.TypeFor[func(string, zapcore.PrimitiveArrayEncoder)]() {
 		return zapcore.NameEncoder(data.(func(string, zapcore.PrimitiveArrayEncoder))), nil
+	}
+	return data, nil
+}
+
+// DecodeLevelEnablerHook decodes the level enabler.
+//
+//   - For type string or []byte, [zapcore.Level.UnmarshalText] will be called to parse the value.
+//   - For type which can be converted to int8, it will convert the value to [zapcore.Level] and return it.
+//   - For type which implements [zapcore.LevelEnabler], it will return the value directly.
+//   - For type func([zapcore.Level]) bool, it will convert the value to [zapcore.LevelEnabler] and return it.
+func DecodeLevelEnablerHook(f reflect.Type, t reflect.Type, data any) (any, error) {
+	if t != reflect.TypeFor[zapcore.LevelEnabler]() {
+		return data, nil
+	}
+	if f == reflect.TypeFor[string]() {
+		var le = new(zapcore.Level)
+		if err := le.UnmarshalText([]byte(data.(string))); err != nil {
+			return nil, err
+		}
+		return *le, nil
+	}
+	if f == reflect.TypeFor[[]byte]() {
+		var le = new(zapcore.Level)
+		if err := le.UnmarshalText(data.([]byte)); err != nil {
+			return nil, err
+		}
+		return *le, nil
+	}
+	if f.ConvertibleTo(reflect.TypeFor[int8]()) {
+		le := zapcore.Level(reflect.ValueOf(data).Convert(reflect.TypeFor[int8]()).Interface().(int8))
+		if le >= zapcore.DebugLevel && le <= zapcore.PanicLevel {
+			return le, nil
+		}
+		return nil, exception.NewArgumentException("data", data, "invalid value")
+	}
+	if f.Implements(reflect.TypeFor[zapcore.LevelEnabler]()) {
+		return data.(zapcore.LevelEnabler), nil
+	}
+	if f == reflect.TypeFor[zap.LevelEnablerFunc]() {
+		if value, ok := data.(zap.LevelEnablerFunc); ok {
+			return value, nil
+		} else {
+			return zap.LevelEnablerFunc(data.(func(zapcore.Level) bool)), nil
+		}
+	}
+	if f == reflect.TypeFor[func(zapcore.Level) bool]() {
+		return zap.LevelEnablerFunc(data.(func(zapcore.Level) bool)), nil
+	}
+	return data, nil
+}
+
+// CheckWriteHookFunc returns a [zapcore.CheckWriteHook] by the given function.
+func CheckWriteHookFunc(fn func(entry *zapcore.CheckedEntry, fields []zapcore.Field)) zapcore.CheckWriteHook {
+	return &checkWriteAction{
+		callback: fn,
+	}
+}
+
+type checkWriteAction struct {
+	callback func(entry *zapcore.CheckedEntry, fields []zapcore.Field)
+}
+
+func (c *checkWriteAction) OnWrite(entry *zapcore.CheckedEntry, fields []zapcore.Field) {
+	c.callback(entry, fields)
+}
+
+// DecodeCheckWriteHook decodes the check write hook.
+//
+//	For type string, it will be converted to [zapcore.CheckWriteHook] by the following rules:
+//	  1. "0" or "noop" will be converted to [zapcore.WriteThenNoop].
+//	  2. "1" or "goexit" will be converted to [zapcore.WriteThenGoexit].
+//	  3. "2" or "panic" will be converted to [zapcore.WriteThenPanic].
+//	  4. "3" or "fatal" will be converted to [zapcore.WriteThenFatal].
+//	For type [zapcore.CheckWriteHook], it will return the value directly.
+//	For type func([zapcore.CheckedEntry], []zapcore.Field), it will convert the value to [zapcore.CheckWriteHook] and return it.
+//	For type which can be converted to uint8, it will be converted to [zapcore.CheckWriteHook] by the following rules:
+//	  1. 0 will be converted to [zapcore.WriteThenNoop].
+//	  2. 1 will be converted to [zapcore.WriteThenGoexit].
+//	  3. 2 will be converted to [zapcore.WriteThenPanic].
+//	  4. 3 will be converted to [zapcore.WriteThenFatal].
+func DecodeCheckWriteHook(f reflect.Type, t reflect.Type, data any) (any, error) {
+	if t != reflect.TypeFor[zapcore.CheckWriteHook]() {
+		return data, nil
+	}
+	if f.Implements(reflect.TypeFor[zapcore.CheckWriteHook]()) {
+		return data.(zapcore.CheckWriteHook), nil
+	}
+	if f == reflect.TypeFor[string]() {
+		switch strings.ToLower(data.(string)) {
+		case "0", "noop":
+			return zapcore.WriteThenNoop, nil
+		case "1", "goexit":
+			return zapcore.WriteThenGoexit, nil
+		case "2", "panic":
+			return zapcore.WriteThenPanic, nil
+		case "3", "fatal":
+			return zapcore.WriteThenFatal, nil
+		default:
+			return nil, exception.NewArgumentException("data", data, "invalid value for CheckWriteHook: "+data.(string))
+		}
+	}
+	if f == reflect.TypeFor[[]byte]() {
+		switch strings.ToLower(string(data.([]byte))) {
+		case "0", "noop":
+			return zapcore.WriteThenNoop, nil
+		case "1", "goexit":
+			return zapcore.WriteThenGoexit, nil
+		case "2", "panic":
+			return zapcore.WriteThenPanic, nil
+		case "3", "fatal":
+			return zapcore.WriteThenFatal, nil
+		default:
+			return nil, exception.NewArgumentException("data", data, "invalid value for CheckWriteHook: "+string(data.([]byte)))
+		}
+	}
+	if f.ConvertibleTo(reflect.TypeFor[uint8]()) {
+		switch reflect.ValueOf(data).Convert(reflect.TypeFor[uint8]()).Interface().(uint8) {
+		case 0:
+			return zapcore.WriteThenNoop, nil
+		case 1:
+			return zapcore.WriteThenGoexit, nil
+		case 2:
+			return zapcore.WriteThenPanic, nil
+		case 3:
+			return zapcore.WriteThenFatal, nil
+		default:
+			return nil, exception.NewArgumentException("data", data, fmt.Sprintf("invalid value for CheckWriteHook: %v", data))
+		}
+	}
+	if f == reflect.TypeFor[func(*zapcore.CheckedEntry, []zapcore.Field)]() {
+		return CheckWriteHookFunc(data.(func(*zapcore.CheckedEntry, []zapcore.Field))), nil
 	}
 	return data, nil
 }
