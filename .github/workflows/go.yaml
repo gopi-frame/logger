@@ -26,11 +26,22 @@ jobs:
           go mod tidy
           go test -v -coverprofile=coverage.out ./...
 
-      - name: Upload coverage reports to Codecov
+      - name: Upload slog coverage reports to Codecov
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./driver/slog/coverage.out,./driver/zap/coverage.out
+          files: ./driver/slog/coverage.out
           fail_ci_if_error: true
           verbose: true
+          flags: slog
+          codecov_yml_path: ./.codecov.yml
+
+      - name: Upload zap coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./driver/zap/coverage.out
+          fail_ci_if_error: true
+          verbose: true
+          flags: zap
           codecov_yml_path: ./.codecov.yml
