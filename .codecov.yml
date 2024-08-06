@@ -23,11 +23,11 @@ flags:
   slog:
     carryforward: true
     paths:
-      - "driver/slog"
+      - "driver/slog/*"
   zap:
     carryforward: true
     paths:
-      - "driver/zap"
+      - "driver/zap/*"
 
 ignore:
   - driver/slog/handler.go

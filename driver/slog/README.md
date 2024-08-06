@@ -1,4 +1,7 @@
 # slog
+[![Go Reference](https://pkg.go.dev/badge/github.com/gopi-frame/logger/driver/slog.svg)](https://pkg.go.dev/github.com/gopi-frame/logger/driver/slog)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gopi-frame/logger/driver/slog)](https://goreportcard.com/report/github.com/gopi-frame/logger/driver/slog)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 Package slog implements a logger using the [slog](https://pkg.go.dev/log/slog) package.
 
