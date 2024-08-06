@@ -1,5 +1,6 @@
 # slog
 [![Go Reference](https://pkg.go.dev/badge/github.com/gopi-frame/logger/driver/slog.svg)](https://pkg.go.dev/github.com/gopi-frame/logger/driver/slog)
+[![codecov](https://codecov.io/gh/gopi-frame/logger/graph/badge.svg?token=9EUOUXQ6PD&flag=slog)](https://codecov.io/gh/gopi-frame/logger?flag=slog)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gopi-frame/logger/driver/slog)](https://goreportcard.com/report/github.com/gopi-frame/logger/driver/slog)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 

@@ -1,4 +1,9 @@
 # zap
+[![Go Reference](https://pkg.go.dev/badge/github.com/gopi-frame/logger/driver/zap.svg)](https://pkg.go.dev/github.com/gopi-frame/logger/driver/zap)
+[![codecov](https://codecov.io/gh/gopi-frame/logger/graph/badge.svg?token=9EUOUXQ6PD&flag=zap)](https://codecov.io/gh/gopi-frame/logger?flag=zap)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gopi-frame/logger/driver/zap)](https://goreportcard.com/report/github.com/gopi-frame/logger/driver/zap)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
 Package zap is an implementation for [gopi-frame/logger](../../README.md) based on [uber-go/zap](https://github.com/uber-go/zap).
 And this package can be used as a stand-alone package.
 ## Installation
