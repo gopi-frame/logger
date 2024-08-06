@@ -31,10 +31,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./driver/slog/coverage.out
-          flags:
-            - unittests
-            - slog
-            - logger-driver
+          flags: unittests | slog | logger-driver
           fail_ci_if_error: true
           verbose: true
 
@@ -43,9 +40,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./driver/zap/coverage.out
-          flags:
-            - unittests
-            - zap
-            - logger-driver
+          flags: unittests | zap | logger-driver
           fail_ci_if_error: true
           verbose: true
