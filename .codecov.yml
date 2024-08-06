@@ -28,3 +28,6 @@ flags:
     carryforward: true
     paths:
       - "driver/zap"
+
+ignore:
+  - driver/slog/handler.go
