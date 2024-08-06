@@ -30,17 +30,7 @@ jobs:
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./driver/slog/coverage.out
-          flags: unittests | slog | logger-driver
+          files: ./driver/slog/coverage.out,./driver/zap/coverage.out
           fail_ci_if_error: true
           verbose: true
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4.0.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./driver/zap/coverage.out
-          flags: unittests | zap | logger-driver
-          fail_ci_if_error: true
-          verbose: true
-          codecov_yml_path: ./.codecov.yaml
+          codecov_yml_path: ./.codecov.yml
