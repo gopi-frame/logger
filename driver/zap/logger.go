@@ -131,7 +131,7 @@ func (l *Logger) Warnf(format string, args ...any) {
 	l.Logger.Warn(fmt.Sprintf(format, args...), values...)
 }
 
-// Error logs a message at error level.
+// Error logs a message at exception level.
 func (l *Logger) Error(message string) {
 	var values []zap.Field
 	if value := logger.GetValue(l.ctx); value != nil {
@@ -140,7 +140,7 @@ func (l *Logger) Error(message string) {
 	l.Logger.Error(message, values...)
 }
 
-// Errorf logs a formatted message at error level.
+// Errorf logs a formatted message at exception level.
 func (l *Logger) Errorf(format string, args ...any) {
 	var values []zap.Field
 	if value := logger.GetValue(l.ctx); value != nil {

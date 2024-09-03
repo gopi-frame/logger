@@ -125,28 +125,28 @@ func TestLogger(t *testing.T) {
 		assert.Equal(t, "warn", data["context"].(map[string]any)["test"])
 	})
 
-	t.Run("error", func(t *testing.T) {
+	t.Run("exception", func(t *testing.T) {
 		buffer.Reset()
-		ctx := logger.WithValue(context.Background(), map[string]any{"test": "error"})
-		l.WithContext(ctx).Error("error")
+		ctx := logger.WithValue(context.Background(), map[string]any{"test": "exception"})
+		l.WithContext(ctx).Error("exception")
 		assert.True(t, strings.HasSuffix(buffer.String(), "\r\n"))
 		data := make(map[string]any)
 		err = json.Unmarshal(buffer.Bytes(), &data)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
-		assert.Equal(t, "error", data["level"])
-		assert.Equal(t, "error", data["message"])
+		assert.Equal(t, "exception", data["level"])
+		assert.Equal(t, "exception", data["message"])
 		assert.Equal(t, "value", data["key"])
 		assert.Contains(t, data["caller"], "logger.go")
 		assert.Contains(t, data["function"], "Error")
 		assert.NotNil(t, data["stacktrace"])
-		assert.Equal(t, "error", data["context"].(map[string]any)["test"])
+		assert.Equal(t, "exception", data["context"].(map[string]any)["test"])
 	})
 
 	t.Run("errorf", func(t *testing.T) {
 		buffer.Reset()
-		ctx := logger.WithValue(context.Background(), map[string]any{"test": "error"})
+		ctx := logger.WithValue(context.Background(), map[string]any{"test": "exception"})
 		l.WithContext(ctx).Errorf("errorf: %s", "errorf")
 		assert.True(t, strings.HasSuffix(buffer.String(), "\r\n"))
 		data := make(map[string]any)
@@ -154,13 +154,13 @@ func TestLogger(t *testing.T) {
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
-		assert.Equal(t, "error", data["level"])
+		assert.Equal(t, "exception", data["level"])
 		assert.Equal(t, "errorf: errorf", data["message"])
 		assert.Equal(t, "value", data["key"])
 		assert.Contains(t, data["caller"], "logger.go")
 		assert.Contains(t, data["function"], "Error")
 		assert.NotNil(t, data["stacktrace"])
-		assert.Equal(t, "error", data["context"].(map[string]any)["test"])
+		assert.Equal(t, "exception", data["context"].(map[string]any)["test"])
 	})
 
 	t.Run("panic", func(t *testing.T) {

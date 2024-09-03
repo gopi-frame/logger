@@ -42,7 +42,7 @@ func (m *Manager) Warn(message string) {
 	m.Channel().Warn(message)
 }
 
-// Error logs an error message
+// Error logs an exception message
 func (m *Manager) Error(message string) {
 	m.Channel().Error(message)
 }

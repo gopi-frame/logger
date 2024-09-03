@@ -64,7 +64,7 @@ const (
 	CallerEncoderShort = "short"
 )
 
-// Name encoder enums
+// name encoder enums
 const (
 	NameEncoderFull = "full"
 )

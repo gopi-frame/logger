@@ -83,18 +83,18 @@ func TestLogger(t *testing.T) {
 		assert.Equal(t, "warnf: warnf", data[slog.MessageKey])
 	})
 
-	t.Run("error", func(t *testing.T) {
+	t.Run("exception", func(t *testing.T) {
 		buffer.Reset()
-		ctx := logger.WithValue(context.Background(), map[string]any{"test": "error"})
-		l.WithContext(ctx).Error("error")
+		ctx := logger.WithValue(context.Background(), map[string]any{"test": "exception"})
+		l.WithContext(ctx).Error("exception")
 		assert.NotZero(t, buffer.Len())
 		var data map[string]any
 		if err := json.Unmarshal(buffer.Bytes(), &data); err != nil {
 			assert.FailNow(t, err.Error())
 		}
 		assert.Equal(t, "ERROR", data[slog.LevelKey])
-		assert.Equal(t, "error", data[slog.MessageKey])
-		assert.Equal(t, "error", data["context"].(map[string]any)["test"])
+		assert.Equal(t, "exception", data[slog.MessageKey])
+		assert.Equal(t, "exception", data["context"].(map[string]any)["test"])
 	})
 
 	t.Run("errorf", func(t *testing.T) {
