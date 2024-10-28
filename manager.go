@@ -1,58 +1,113 @@
 package logger
 
 import (
-	"github.com/gopi-frame/container"
+	"github.com/gopi-frame/collection/kv"
 	"github.com/gopi-frame/contract/logger"
 )
 
-// Manager is a logger manager
-type Manager struct {
-	defaultLogger string
-	container.Container[logger.Logger]
+// LoggerManager is a logger manager and a proxy for the default logger.
+type LoggerManager struct {
+	logger.Logger
+
+	defaultChannel string
+	channels       *kv.Map[string, logger.Logger]
+	lazyChannels   *kv.Map[string, func() (logger.Logger, error)]
 }
 
-// New creates a new logger manager
-func New(defaultLogger string) *Manager {
-	return &Manager{
-		defaultLogger: defaultLogger,
-		Container:     *container.New[logger.Logger](),
+// NewManager creates a new logger manager.
+func NewManager() *LoggerManager {
+	return &LoggerManager{
+		channels:     kv.NewMap[string, logger.Logger](),
+		lazyChannels: kv.NewMap[string, func() (logger.Logger, error)](),
 	}
 }
 
-// Channel gets the channel by name or default logger
-func (m *Manager) Channel(name ...string) logger.Logger {
-	if len(name) == 0 {
-		return m.Get(m.defaultLogger)
+// SetDefaultChannel sets the default channel name.
+func (m *LoggerManager) SetDefaultChannel(name string) {
+	m.defaultChannel = name
+}
+
+// Use sets the default channel instance.
+func (m *LoggerManager) Use(channel logger.Logger) *LoggerManager {
+	m.Logger = channel
+	return m
+}
+
+// AddChannel adds a channel to the manager.
+func (m *LoggerManager) AddChannel(name string, logger logger.Logger) {
+	m.channels.Lock()
+	defer m.channels.Unlock()
+	m.channels.Set(name, logger)
+}
+
+// AddLazyChannel adds a lazy channel to the manager.
+func (m *LoggerManager) AddLazyChannel(name string, config map[string]any) {
+	m.lazyChannels.Lock()
+	defer m.lazyChannels.Unlock()
+	m.lazyChannels.Set(name, func() (logger.Logger, error) {
+		driver := config["driver"].(string)
+		return Open(driver, config)
+	})
+}
+
+// HasChannel returns true if the channel with the given name exists.
+func (m *LoggerManager) HasChannel(name string) bool {
+	m.channels.RLock()
+	if m.channels.ContainsKey(name) {
+		m.channels.RUnlock()
+		return true
 	}
-	return m.Get(name[0])
+	m.channels.RUnlock()
+	m.lazyChannels.RLock()
+	if m.lazyChannels.ContainsKey(name) {
+		m.lazyChannels.RUnlock()
+		return true
+	}
+	m.lazyChannels.RUnlock()
+	return false
 }
 
-// Debug logs a debug message
-func (m *Manager) Debug(message string) {
-	m.Channel().Debug(message)
+// TryChannel returns the channel with the given name.
+// If the channel is not found or error occurred, it returns an error.
+func (m *LoggerManager) TryChannel(name string) (logger.Logger, error) {
+	m.channels.RLock()
+	if channel, ok := m.channels.Get(name); ok {
+		m.channels.RUnlock()
+		return channel, nil
+	}
+	m.channels.RUnlock()
+	m.lazyChannels.RLock()
+	if lazyChannel, ok := m.lazyChannels.Get(name); ok {
+		m.lazyChannels.RUnlock()
+		channel, err := lazyChannel()
+		if err != nil {
+			return nil, err
+		}
+		m.channels.Lock()
+		defer m.channels.Unlock()
+		m.channels.Set(name, channel)
+		return channel, nil
+	}
+	m.lazyChannels.RUnlock()
+	return nil, NewNotConfiguredChannelException(name)
 }
 
-// Info logs an info message
-func (m *Manager) Info(message string) {
-	m.Channel().Info(message)
+// Channel returns the channel with the given name.
+// If the channel is not found or error occurred, it panics.
+func (m *LoggerManager) Channel(name string) logger.Logger {
+	channel, err := m.TryChannel(name)
+	if err != nil {
+		panic(err)
+	}
+	return channel
 }
 
-// Warn logs a warning message
-func (m *Manager) Warn(message string) {
-	m.Channel().Warn(message)
-}
-
-// Error logs an exception message
-func (m *Manager) Error(message string) {
-	m.Channel().Error(message)
-}
-
-// Fatal logs a fatal message
-func (m *Manager) Fatal(message string) {
-	m.Channel().Fatal(message)
-}
-
-// Panic logs a panic message
-func (m *Manager) Panic(message string) {
-	m.Channel().Panic(message)
+// ChannelOrDefault returns the channel with the given name.
+// If the channel is not found or error occurred, it returns the default channel.
+func (m *LoggerManager) ChannelOrDefault(name string) logger.Logger {
+	channel, err := m.TryChannel(name)
+	if err != nil {
+		channel = m.Channel(m.defaultChannel)
+	}
+	return channel
 }

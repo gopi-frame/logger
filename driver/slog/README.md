@@ -50,11 +50,11 @@ func main() {
     cfg := slog.NewConfig()
     cfg.Apply(
         slog.WithLevel(slog.LevelDebug)
-    slog.AddSource(),
+        slog.AddSource(),
         slog.WithFields(map[string]any{
             "key": "value",
         }),
-)
+    )
     l, err := slog.NewLogger(cfg)
     if err != nil {
         panic(err)

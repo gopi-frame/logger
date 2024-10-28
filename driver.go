@@ -42,7 +42,7 @@ func Open(driverName string, options map[string]any) (logger.Logger, error) {
 	driver, ok := drivers.Get(driverName)
 	drivers.RUnlock()
 	if !ok {
-		return nil, exception.NewArgumentException("driverName", driverName, fmt.Sprintf("unknown driver \"%s\"", driverName))
+		return nil, NewUnknownDriverException(driverName)
 	}
 	return driver.Open(options)
 }
