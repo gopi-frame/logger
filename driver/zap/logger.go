@@ -5,6 +5,7 @@ package zap
 import (
 	"context"
 	"fmt"
+
 	loggercontract "github.com/gopi-frame/contract/logger"
 	"github.com/gopi-frame/logger"
 	"go.uber.org/zap"
@@ -12,12 +13,12 @@ import (
 )
 
 var levelMap = map[loggercontract.Level]zapcore.Level{
-	loggercontract.LevelDebug: zapcore.DebugLevel,
-	loggercontract.LevelInfo:  zapcore.InfoLevel,
-	loggercontract.LevelWarn:  zapcore.WarnLevel,
-	loggercontract.LevelError: zapcore.ErrorLevel,
-	loggercontract.LevelFatal: zapcore.FatalLevel,
-	loggercontract.LevelPanic: zapcore.PanicLevel,
+	logger.LevelDebug: zapcore.DebugLevel,
+	logger.LevelInfo:  zapcore.InfoLevel,
+	logger.LevelWarn:  zapcore.WarnLevel,
+	logger.LevelError: zapcore.ErrorLevel,
+	logger.LevelFatal: zapcore.FatalLevel,
+	logger.LevelPanic: zapcore.PanicLevel,
 }
 
 // Logger is a wrapper around [zap.Logger].

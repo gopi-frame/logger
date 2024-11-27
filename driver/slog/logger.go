@@ -3,19 +3,20 @@ package slog
 import (
 	"context"
 	"fmt"
-	loggercontract "github.com/gopi-frame/contract/logger"
-	"github.com/gopi-frame/logger"
 	"log/slog"
 	"os"
+
+	loggercontract "github.com/gopi-frame/contract/logger"
+	"github.com/gopi-frame/logger"
 )
 
 var levelMap = map[loggercontract.Level]slog.Level{
-	loggercontract.LevelDebug: slog.LevelDebug,
-	loggercontract.LevelInfo:  slog.LevelInfo,
-	loggercontract.LevelWarn:  slog.LevelWarn,
-	loggercontract.LevelError: slog.LevelError,
-	loggercontract.LevelPanic: LevelPanic,
-	loggercontract.LevelFatal: LevelFatal,
+	logger.LevelDebug: slog.LevelDebug,
+	logger.LevelInfo:  slog.LevelInfo,
+	logger.LevelWarn:  slog.LevelWarn,
+	logger.LevelError: slog.LevelError,
+	logger.LevelPanic: LevelPanic,
+	logger.LevelFatal: LevelFatal,
 }
 
 // Logger is a [slog] backed logger.

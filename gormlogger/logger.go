@@ -4,8 +4,9 @@ package gormlogger
 import (
 	"context"
 	"errors"
-	"github.com/gopi-frame/logger"
 	"time"
+
+	"github.com/gopi-frame/logger"
 
 	loggercontract "github.com/gopi-frame/contract/logger"
 	"gorm.io/gorm"
@@ -13,9 +14,9 @@ import (
 )
 
 var levelMap = map[gormlogger.LogLevel]loggercontract.Level{
-	gormlogger.Error: loggercontract.LevelError,
-	gormlogger.Warn:  loggercontract.LevelWarn,
-	gormlogger.Info:  loggercontract.LevelInfo,
+	gormlogger.Error: logger.LevelError,
+	gormlogger.Warn:  logger.LevelWarn,
+	gormlogger.Info:  logger.LevelInfo,
 }
 
 type Logger struct {
